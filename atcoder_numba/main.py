@@ -9,7 +9,8 @@ from numba.pycc import CC
 
 config = {
     'module_name': 'numba_modules',
-    'suffix': '_aot'
+    'suffix': '_aot',
+    'example': 'in_1.txt'
 }
 
 
@@ -21,18 +22,38 @@ def aot_compile(file_name):
     """
     cc = CC(config['module_name'])
     func = []
-    module = importlib.import_module(file_name)
+    signatures = []
+    if os.path.exists(config['example']):
+        f = os.open(config['example'], os.O_RDONLY)
+        stdin_bk = os.dup(0)
+        os.dup2(f, 0)
+        try:
+            module = importlib.import_module(file_name)
+            module.main()
+            auto_jit = True
+        finally:
+            os.dup2(stdin_bk, 0)
+            os.close(f)
+    else:
+        module = importlib.import_module(file_name)
+        auto_jit = False
     for dir_ in dir(module):
         e = eval('module.' + dir_)
         if type(e) == numba.targets.registry.CPUDispatcher \
                 and e.nopython_signatures:
             cc.export(dir_, e.nopython_signatures[0])(e)
             func.append(dir_)
+            signatures.append(str(e.nopython_signatures[0]))
 
     cc.output_dir = os.curdir
     if func:
         cc.compile()
-    return cc, func
+    return cc, func, signatures, auto_jit
+
+
+def signature_info(f_out, func, signatures):
+    for f, s in zip(func, signatures):
+        f_out.write("    # {}: {}\n".format(f, s))
 
 
 def attach_module(f_out, cc, func):
@@ -59,13 +80,15 @@ def attach_module(f_out, cc, func):
     f_out.write("        f.write(gz)\n")
 
 
-def edit_code(cc, func, file_name):
+def edit_code(file_name, cc, func, signatures, auto_jit):
     """
     :param cc:
     :param func:
+    :param signatures
     :param file_name:
     :return:
     """
+    signature_info_flag = True
     with open(file_name + '.py', 'r') as f_in:
         with open(file_name + config['suffix'] + '.py', 'w') as f_out:
             pattern_numba = re.compile(r"from(\s+)numba|import(\s+)numba|@numba|@jit|@njit")
@@ -76,20 +99,26 @@ def edit_code(cc, func, file_name):
                 else:
                     f_out.write(line)
                 if pattern_main.match(line):
-                    if sys.argv[1] == "submit" and func:
+                    if auto_jit:
+                        signature_info(f_out, func, signatures)
+                        signature_info_flag = False
+                    if sys.argv[1] == "embed" and func:
                         attach_module(f_out, cc, func)
                     if func:
                         f_out.write("    from {} import {}\n".format(cc.name, ', '.join(func)))
+            if auto_jit and signature_info_flag:
+                f_out.write("\n\n")
+                signature_info(f_out, func, signatures)
 
 
 def usage_message():
     print("Usage:")
     print("{} compile inputs -- Ahead-of-time compilation ".format(sys.argv[0]))
-    print("{} submit inputs -- Create code for submit to Atcoder".format(sys.argv[0]))
+    print("{} embed inputs -- Create code for submit to Atcoder".format(sys.argv[0]))
 
 
 def main():
-    if len(sys.argv) < 2 or sys.argv[1] not in ("compile", "submit"):
+    if len(sys.argv) < 2 or sys.argv[1] not in ("compile", "embed"):
         usage_message()
         sys.exit(-1)
 
@@ -103,8 +132,8 @@ def main():
     os.chdir(dir_)
     sys.path.insert(0, dir_)
     file_name = os.path.splitext(os.path.basename(path_))[0]
-    cc, func = aot_compile(file_name)
-    edit_code(cc, func, 'main')
+    cc, func, signatures, auto_jit = aot_compile(file_name)
+    edit_code('main', cc, func, signatures, auto_jit)
 
 
 if __name__ == '__main__':
