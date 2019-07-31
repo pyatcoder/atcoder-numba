@@ -11,7 +11,7 @@ here = path.abspath(path.dirname(__file__))
 
 setup(
     name='atcoder-numba',
-    version='0.1.0',
+    version='0.2.0',
     description='AtCoder Numba AOT Tools',
     classifiers=[  # Optional
         # How mature is this project? Common values are
