@@ -82,9 +82,9 @@ def attach_module(f_out, cc, func):
     f_out.write("    'func': {},\n".format(func))
     f_out.write("    'gz': {}\n".format(str(asc)))
     f_out.write("}\n")
-    f_out.write("import gzip, base64\n")
+    f_out.write("import gzip, base64, os\n")
     f_out.write("gz = gzip.decompress(base64.b64decode(atcoder['gz']))\n")
-    f_out.write("with open(atcoder['file'], 'wb') as f:\n")
+    f_out.write("with open(os.path.join(os.path.dirname(__file__), atcoder['file']), 'wb') as f:\n")
     f_out.write("    f.write(gz)\n")
 
 
@@ -142,40 +142,35 @@ def edit_code(file_name, cc, func, signatures, auto_jit):
     with open(file_name + '.py', 'r') as f_in:
         with open(file_name + config['suffix'] + '.py', 'w') as f_out:
             for line in f_in:
-                if mode == 0:
+                if pattern_def.match(line):
+                    write_func_info(line)
+                elif pattern_empty.match(line):
+                    f_out.write('\n')
+                elif pattern_comment.match(line):
+                    f_out.write(line)
+                elif pattern_decorator.match(line):
+                    mode = 2
+                    que.put(line)
+                elif mode == 0:
                     if pattern_numba.match(line):
                         f_out.write('# ' + line)
-                    elif pattern_decorator.match(line):
-                        mode = 2
-                        que.put(line)
-                    elif pattern_def.match(line):
-                        write_func_info(line)
                     else:
                         f_out.write(line)
                 elif mode == 1:
-                    if pattern_empty.match(line):
-                        f_out.write('\n')
-                    elif pattern_comment.match(line):
-                        f_out.write(line)
-                    elif pattern_indent.match(line):
+                    if pattern_indent.match(line):
                         f_out.write('# ' + line)
-                    else:
+                    elif pattern_numba.match(line):
+                        f_out.write('# ' + line)
                         mode = 0
+                    else:
                         f_out.write(line)
+                        mode = 0
                 elif mode == 2:
-                    if pattern_decorator.match(line) or\
-                            pattern_empty.match(line) or\
-                            pattern_comment.match(line):
-                        que.put(line)
-                    elif pattern_def.match(line):
-                        write_func_info(line)
-                    else:
-                        while not que.empty():
-                            t = que.get()
-                            f_out.write(t)
-                        f_out.write(line)
-                        mode = 0
-
+                    while not que.empty():
+                        t = que.get()
+                        f_out.write(t)
+                    f_out.write(line)
+                    mode = 0
 
 def usage_message():
     print("Usage:")

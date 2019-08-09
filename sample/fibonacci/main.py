@@ -1,7 +1,7 @@
-from numba import jit, njit
+from numba import njit
 
 
-@njit('i8(i8)')
+@njit
 def fib(n):
     if n < 2:
         return n
@@ -9,9 +9,4 @@ def fib(n):
         return fib(n - 2) + fib(n - 1)
 
 
-def main():
-    print(fib(30))
-
-
-if __name__ == "__main__":
-    main()
+print(fib(30))
