@@ -8,6 +8,8 @@ import queue
 import runpy
 import numba
 from numba.pycc import CC
+from atcoder_numba.atcoder_pythran import main as pythran_main
+from atcoder_numba.atcoder_cython import main as cython_main
 
 config = {
     'module_name': 'numba_modules',
@@ -179,7 +181,7 @@ def usage_message():
 
 
 def main():
-    if len(sys.argv) < 2 or sys.argv[1] not in ("compile", "embed"):
+    if len(sys.argv) < 2 or sys.argv[1] not in ("compile", "embed", "pythran", "cython"):
         usage_message()
         sys.exit(-1)
 
@@ -187,6 +189,11 @@ def main():
         usage_message()
         print("atcoder-numba: error: the following arguments are required: inputs")
         sys.exit(-1)
+
+    if sys.argv[1] == "pythran":
+        pythran_main()
+    if sys.argv[1] == "cython":
+        cython_main()
 
     path_ = os.path.abspath(sys.argv[-1])
     dir_ = os.path.dirname(path_)
